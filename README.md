@@ -1,4 +1,4 @@
 # QuestionAnsweringSystem
 
-* Graph Database (AllegroGraphp).
+* Graph Database (AllegroGraph).
 * Dementia ontology.
