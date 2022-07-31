@@ -1,3 +1,4 @@
+from random import triangular
 from franz.openrdf.connect import ag_connect
 from franz.openrdf.vocabulary.xmlschema import XMLSchema
 from franz.openrdf.query.query import QueryLanguage
@@ -120,9 +121,9 @@ class Allegrograph(object):
                 for i in verbs:
                     verb = str(i).lower()
                     domain = self.get_domain(verb)
-                    print("Here is the actual domain and range: ")
-                    print(domain, "\n")
                     if (domain):
+                        print("Here is the actual domain and range: ")
+                        print(domain, "\n")
                         keyword = extract_kw(word)
                         index = 0
                         for j in range(len(keyword)):
@@ -137,9 +138,15 @@ class Allegrograph(object):
                                 return self.get_statement(domain[0]["o2"])
                             elif kw[k][0].lower() in domain[0]["o_comment"].lower() or kw[k][0] in domain[0]["o2_comment"].lower():
                                 return self.get_statement(domain[0]["o2"])
+                    else:
+                        if self.free_text_search(verb):
+                            return self.free_text_search(verb)
             else:
                 kw = extract_kw(word)
-            result = kw[0][0]
+            if (kw):
+                result = kw[0][0]
+            else:
+                return
             print("First keyword: ", result)
             print()
             result = ' '.join(elem.capitalize() for elem in result.split())
@@ -156,30 +163,40 @@ class Allegrograph(object):
         if array:
             return array
         else:
-            pred = self.conn.createURI(namespace='http://www.w3.org/2000/01/rdf-schema#',
-                            localname='label')
-            self.conn.createFreeTextIndex("index1", predicates=[pred])
-            for triple in self.conn.evalFreeTextSearch(
-                result, index="index1"):
-                s = self.delete_symbols(triple[0], "s")
-                p = self.delete_symbols(triple[1], "p")
-                o = self.delete_symbols(triple[2], "o")
-                dict = {"s": s, "p": p, "o": o}
-                subject = dict["s"]
-                subject = ' '.join(elem.capitalize() for elem in subject.split())
-                subject = subject.replace(" ", "")
-                query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %subject
-                tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
-                result = tuple_query.evaluate()
-                for i in result:
-                    dict = {"subject": subject, "o": str(i["o"])}
-                    array.append(dict)
+            array = self.free_text_search(result)
             if array:
                 return array
             else:
                 for i in range(len(kw) -1, 0, -1):
                     print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
                     return self.get_statement(kw[i][0])
+
+    def free_text_search(self, result):
+        array = []
+        pred = self.conn.createURI(namespace='http://www.w3.org/2000/01/rdf-schema#',
+                            localname='label')
+        self.conn.createFreeTextIndex("index1", predicates=[pred])
+        for triple in self.conn.evalFreeTextSearch(
+            result, index="index1"):
+            s = self.delete_symbols(triple[0], "s")
+            p = self.delete_symbols(triple[1], "p")
+            o = self.delete_symbols(triple[2], "o")
+            dict = {"s": s, "p": p, "o": o}
+            subject = dict["s"]
+            #fixhere
+            subject2 = ' '.join(elem.capitalize() for elem in subject.split())
+            subject2 = subject.replace(" ", "")
+            query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %subject2
+            tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+            result = tuple_query.evaluate()
+            if not result:
+                query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %subject
+                tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+            for i in result:
+                dict = {"subject": subject, "o": str(i["o"])}
+                array.append(dict)
+        return array
+        
             # else:
             #     try:
             #         domain_dict = self.get_domain(kw[len(kw)-1][0])
