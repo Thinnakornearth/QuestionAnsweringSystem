@@ -1,0 +1,34 @@
+version: '3'
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - 12345:5000
+    networks:
+      - qas
+    depends_on:
+      - agraph
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - 8080:80
+    networks:
+      - qas
+  agraph:
+    image: franzinc/agraph
+    restart: always
+    shm_size: 1g
+    environment: 
+      AGRAPH_SUPER_USER: test
+      AGRAPH_SUPER_PASSWORD: xyzzy
+    ports:
+      - 10000-10035:10000-10035
+    networks:
+      - qas
+networks:
+  qas: {}
+

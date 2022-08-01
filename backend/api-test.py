@@ -8,7 +8,7 @@ CORS(app)
 
 @app.route("/")
 def get_all_data():
-    ag = Allegrograph(repo='dranpto', host="10.14.109.78", port=10035, user="thinnakorn", pass_word="Earth6210", create=True, clear=False)
+    ag = Allegrograph(repo='dranpto', host="agraph", port=10035, user="test", pass_word="xyzzy", create=True, clear=False)
     result = ag.get_all_triples()
     array = []
     for i in result:
@@ -20,7 +20,7 @@ def get_all_data():
 @app.route("/search")
 def get_statement():
     search_statement = request.args.get('query')
-    ag = Allegrograph(repo='dranpto', host="10.14.109.78", port=10035, user="thinnakorn", pass_word="Earth6210", create=True, clear=False)
+    ag = Allegrograph(repo='dranpto', host="agraph", port=10035, user="test", pass_word="xyzzy", create=True, clear=False)
     result = ag.get_statement(search_statement)
     return json.dumps(result)
 
