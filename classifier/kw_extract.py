@@ -22,6 +22,7 @@ def extract_verb(sentences):
     return spans
 
 
+
 def extract_kw(keyword):
     kw_extractor = yake.KeywordExtractor(top=10, stopwords=None)
     keywords = kw_extractor.extract_keywords(keyword)

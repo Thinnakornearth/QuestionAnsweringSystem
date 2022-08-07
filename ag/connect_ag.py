@@ -7,7 +7,8 @@ from franz.openrdf.vocabulary import RDF
 from requests import RequestException
 from classifier.kw_extract import extract_kw, extract_verb
 import re
-
+from synonym.nltk_synonym import get_synonym
+from typo.spellingcorrection import fix_typo
 
 class Allegrograph(object):
     def __init__(self, repo, host, port, user, pass_word, create=True, clear=True):
@@ -114,37 +115,44 @@ class Allegrograph(object):
         return array
     
     def get_statement(self, word):
+        word = fix_typo(word)
         kw = []
         if len(word.split()) > 1:
+            if word.split()[0] == "who":
+                return self.get_who_search(word)
+                                                          
             verbs = extract_verb(word)
             if verbs:
                 for i in verbs:
                     verb = str(i).lower()
-                    domain = self.get_domain(verb)
-                    if (domain):
-                        print("Here is the actual domain and range: ")
-                        print(domain, "\n")
-                        keyword = extract_kw(word)
-                        index = 0
-                        for j in range(len(keyword)):
-                            w = keyword[j]
-                            if (w[0] == verb):
-                                index = j
-                        if index > 0:
-                            del keyword[index]
-                        kw = keyword
-                        for k in range(len(kw)):
-                            if kw[k][0].lower() in domain[0]["o"].lower() or kw[k][0] in domain[0]["o2"].lower():
-                                return self.get_statement(domain[0]["o2"])
-                            elif kw[k][0].lower() in domain[0]["o_comment"].lower() or kw[k][0] in domain[0]["o2_comment"].lower():
-                                return self.get_statement(domain[0]["o2"])
-                    else:
-                        if self.free_text_search(verb):
-                            return self.free_text_search(verb)
+                    array_verb = get_synonym(verb)
+                    for each in array_verb:
+                        domain = self.get_domain(each)
+                        if (domain):
+                            print("Here is the actual domain and range: ")
+                            print(domain, "\n")
+                            keyword = extract_kw(word)
+                            index = 0
+                            for j in range(len(keyword)):
+                                w = keyword[j]
+                                if (w[0] == each):
+                                    index = j
+                            if index > 0:
+                                del keyword[index]
+                            kw = keyword
+                            for k in range(len(kw)):
+                                if kw[k][0].lower() in domain[0]["o"].lower() or kw[k][0] in domain[0]["o2"].lower():
+                                    return self.get_statement(domain[0]["o2"])
+                                elif kw[k][0].lower() in domain[0]["o_comment"].lower() or kw[k][0] in domain[0]["o2_comment"].lower():
+                                    return self.get_statement(domain[0]["o2"])
+                        # else:
+                        #     if self.free_text_search(each):
+                        #         return self.free_text_search(each)
             else:
                 kw = extract_kw(word)
             if (kw):
                 result = kw[0][0]
+                print(result)
             else:
                 return
             print("First keyword: ", result)
@@ -152,14 +160,7 @@ class Allegrograph(object):
             result = ' '.join(elem.capitalize() for elem in result.split())
         else:
             result = word
-        array = []
-        result = result.replace(" ", "")
-        query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %result
-        tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
-        query = tuple_query.evaluate()
-        for i in query:
-            dict = {"subject": result, "o": str(i["o"])}
-            array.append(dict)
+        array = self.get_simple_search(result)
         if array:
             return array
         else:
@@ -170,6 +171,68 @@ class Allegrograph(object):
                 for i in range(len(kw) -1, 0, -1):
                     print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
                     return self.get_statement(kw[i][0])
+
+
+    def get_who_search(self, word, original_query=None):
+        verbs = extract_verb(word)
+        array = []
+        domain_temp = []
+        if original_query:
+            word_temp = original_query
+        else:
+            word_temp = word
+        if verbs:
+            for i in verbs:
+                verb = str(i).lower()
+                array_syn = get_synonym(verb)
+                for each in array_syn:
+                    domain = self.get_domain(each)
+                    if (domain):
+                        domain_temp = domain
+                        query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?o . }" %domain[0]["o2"]
+                        tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+                        query = tuple_query.evaluate()
+                        for i in query:
+                            if str(i["o"]) == "<http://www.semanticweb.org/zhenyuzhang/ontologies/DRANPTO/Person>":
+                                keyword = extract_kw(word_temp)
+                                index = 0
+                                for j in range(len(keyword)):
+                                    w = keyword[j]
+                                    if (w[0] == each):
+                                         index = j
+                                if index > 0:
+                                    del keyword[index]
+                                kw = keyword
+                                for k in range(len(kw)):
+                                    if kw[k][0].lower() in domain[0]["o"].lower() or kw[k][0] in domain[0]["o2"].lower():
+                                        array = [{"domain": domain[0]["o2"], "comment": domain[0]["o2_comment"]}]
+                                    elif kw[k][0].lower() in domain[0]["o_comment"].lower() or kw[k][0] in domain[0]["o2_comment"].lower():
+                                        array = [{"domain": domain[0]["o2"], "comment": domain[0]["o2_comment"]}] 
+        if array:
+            return array
+        else:
+            if domain_temp:
+                return self.get_who_search(domain_temp[0]["Domain"][:len(domain_temp[0]["Domain"])-1], original_query=word_temp)
+            else: 
+                return
+                                
+                            
+        
+  
+                            
+
+
+
+    def get_simple_search(self, result):
+        array = []
+        result = result.replace(" ", "")
+        query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %result
+        tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+        query = tuple_query.evaluate()
+        for i in query:
+            dict = {"subject": result, "o": str(i["o"])}
+            array.append(dict)
+        return array
 
     def free_text_search(self, result):
         array = []
@@ -230,6 +293,8 @@ class Allegrograph(object):
             subject = word.replace("ied", "ies")
         elif word[len(word)-1] == "d" and word[len(word)-2] == "e":
             subject = word.replace("ed", "s")
+        elif (any(x.isupper() for x in word)):
+            subject = word
         else:
             subject = word + "s"
         subject = subject.replace(" ", "")

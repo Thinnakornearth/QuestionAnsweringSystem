@@ -7,9 +7,8 @@ NLTK corpus (Wordnet/Popular set) is downloaded
 #     To download the corpus for nltk (needed for first-time only)
 import nltk
 from nltk.corpus import wordnet
-from torch import symeig
 
-qword = input("Insert word to query: ")
+# qword = input("Insert word to query: ")
 
 
 # for syn in wordnet.synsets(qword):
@@ -24,16 +23,21 @@ def get_synonym(word):
     synonyms = []
     for syn in wordnet.synsets(word):
         for l in syn.lemmas():
-            if l.name() not in synonyms:
-                if l.name() == word:
-                    synonyms.insert(0, l.name())
+            name = l.name()
+            if name not in synonyms:
+                if "_" in name:
+                    a = name.split("_")
+                    word2 = a[len(a)-1].capitalize()
+                    name = a[0] + "s" + word2
+                if name == word:
+                    synonyms.insert(0, name)
                 else:
-                    synonyms.append(l.name())
+                    synonyms.append(name)
     print(synonyms)
     return synonyms
 
 
-get_synonym(qword)
+# get_synonym(qword)
 
 # ''' ---- This code below is to turn the common words text file to list ---- '''
 # common_words = []
