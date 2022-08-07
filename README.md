@@ -1,4 +1,7 @@
-# QuestionAnsweringSystem
+# To run
 
-* Graph Database (AllegroGraph).
-* Dementia ontology.
+`docker-compose up --build`
+
+# To view UI
+
+http://localhost:8080

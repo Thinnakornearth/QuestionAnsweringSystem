@@ -1,0 +1,5 @@
+yake==0.4.8
+spacy==3.3.0
+flask
+agraph-python
+flask_cors
