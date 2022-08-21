@@ -8,6 +8,7 @@ from requests import RequestException
 from classifier.kw_extract import extract_kw, extract_verb
 import re
 from synonym.nltk_synonym import get_synonym
+from synonym.nltk_synonym import get_noun_syn
 from typo.spellingcorrection import fix_typo
 
 class Allegrograph(object):
@@ -117,9 +118,12 @@ class Allegrograph(object):
     def get_statement(self, word):
         word = fix_typo(word)
         kw = []
+        keyword = extract_kw(word)
         if len(word.split()) > 1:
             if word.split()[0] == "who":
-                return self.get_who_search(word)
+                return_value = self.get_who_search(word)
+                if return_value:
+                    return return_value
                                                           
             verbs = extract_verb(word)
             if verbs:
@@ -131,7 +135,6 @@ class Allegrograph(object):
                         if (domain):
                             print("Here is the actual domain and range: ")
                             print(domain, "\n")
-                            keyword = extract_kw(word)
                             index = 0
                             for j in range(len(keyword)):
                                 w = keyword[j]
@@ -141,36 +144,107 @@ class Allegrograph(object):
                                 del keyword[index]
                             kw = keyword
                             for k in range(len(kw)):
-                                if kw[k][0].lower() in domain[0]["o"].lower() or kw[k][0] in domain[0]["o2"].lower():
-                                    return self.get_statement(domain[0]["o2"])
-                                elif kw[k][0].lower() in domain[0]["o_comment"].lower() or kw[k][0] in domain[0]["o2_comment"].lower():
-                                    return self.get_statement(domain[0]["o2"])
-                        # else:
-                        #     if self.free_text_search(each):
-                        #         return self.free_text_search(each)
+                                result = kw[k][0]
+                                keyword_synonyms = result.split(" ")
+                                print("Keyword Synonym", keyword_synonyms)
+                                for number_key in range(len(keyword_synonyms)):
+                                    arr_syn = get_synonym(keyword_synonyms[number_key])
+                                    for j in arr_syn:
+                                        j = ''.join(char for char in j if char.isalnum())
+                                        temp = result.replace(keyword_synonyms[number_key], j)
+                                        temp = ' '.join(elem.capitalize() for elem in temp.split())
+                                        print("Result: ", temp)
+                                        if temp.lower() in domain[0]["o"].lower() or temp.lower() in domain[0]["o2"].lower():
+                                            return self.get_statement(domain[0]["o2"])
+                                        elif temp.lower() in domain[0]["o_comment"].lower() or temp.lower() in domain[0]["o2_comment"].lower():
+                                           return self.get_statement(domain[0]["o2"])
+                        #####Not Finish Noun Synonyms for this part !!!
+                        else:
+                            arr = []
+                            if each[len(each)-1] == "e":
+                                new_word = each[:len(each)-1] + "*"
+                            else:
+                                new_word = each + "*"
+                            free_text = self.free_text_search(new_word)
+                            if free_text:
+                                for each_text in free_text:
+                                    s = each_text["subject"].replace(" ", "")
+                                    query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?o . }" %s
+                                    tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+                                    query = tuple_query.evaluate()
+                                    for each_query in query:
+                                        o = self.delete_symbols(str(each_query["o"]), "o")
+                                        if "_" in o:
+                                            for k in keyword:
+                                                t = each_text["o"].replace('."@en', '')
+                                                each_text["o"] = t
+                                                split = each_text["o"].split()
+                                                if k[0] in split and k[0] != each:
+                                                    arr.append(each_text)
+                                                    break
+                                if arr:
+                                    return arr
+                                    
+            
+            #This else is for a query that has no verbs
             else:
-                kw = extract_kw(word)
+                kw = keyword
             if (kw):
-                result = kw[0][0]
-                print(result)
+                array = []
+                for key in kw:
+                    result = key[0]
+                    keyword_synonyms = result.split(" ")
+                    for i in range(len(keyword_synonyms)):
+                        if array:
+                            break
+                        arr_syn = get_synonym(keyword_synonyms[i])
+                        for j in arr_syn:
+                            j = ''.join(char for char in j if char.isalnum())
+                            temp = result.replace(keyword_synonyms[i], j)
+                            temp = ' '.join(elem.capitalize() for elem in temp.split())
+                            print("Result: ", temp)
+                            array = self.get_simple_search(temp)
+                            if array:
+                                break
+                            else:
+                                temp = temp.lower()
+
+                           
+
+
+                    # print("First keyword: ", result)
+                    # print()
+                    # result = ' '.join(elem.capitalize() for elem in result.split())
+                    # array = self.get_simple_search(result)
+
             else:
                 return
-            print("First keyword: ", result)
-            print()
-            result = ' '.join(elem.capitalize() for elem in result.split())
-        else:
-            result = word
-        array = self.get_simple_search(result)
-        if array:
-            return array
-        else:
-            array = self.free_text_search(result)
             if array:
                 return array
             else:
-                for i in range(len(kw) -1, 0, -1):
-                    print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
-                    return self.get_statement(kw[i][0])
+                array = self.free_text_search(kw[0][0])
+                if array:
+                    return array
+                else:
+                    for i in range(len(kw) -1, 0, -1):
+                        print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
+                        return self.get_statement(kw[i][0])
+
+
+        #This else if for statement that has only one word
+        else:
+            result= word
+            array = self.get_simple_search(result)
+            if array:
+                return array
+            else:
+                array = self.free_text_search(result)
+                if array:
+                    return array
+                else:
+                    for i in range(len(kw) -1, 0, -1):
+                        print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
+                        return self.get_statement(kw[i][0])
 
 
     def get_who_search(self, word, original_query=None):
@@ -234,11 +308,14 @@ class Allegrograph(object):
             array.append(dict)
         return array
 
-    def free_text_search(self, result):
+    def free_text_search(self, result, questionMark=None):
         array = []
         pred = self.conn.createURI(namespace='http://www.w3.org/2000/01/rdf-schema#',
-                            localname='label')
+                            localname="label")
         self.conn.createFreeTextIndex("index1", predicates=[pred])
+        if questionMark:
+            result = result[:len(result)-1] + questionMark
+            print(result)
         for triple in self.conn.evalFreeTextSearch(
             result, index="index1"):
             s = self.delete_symbols(triple[0], "s")
@@ -258,7 +335,9 @@ class Allegrograph(object):
             for i in result:
                 dict = {"subject": subject, "o": str(i["o"])}
                 array.append(dict)
-        return array
+        if array:
+            return array
+    
         
             # else:
             #     try:
@@ -282,7 +361,7 @@ class Allegrograph(object):
             #             return self.get_statement(domain_word)
 
 
-    def get_domain(self, word):
+    def get_domain(self, word, ):
         if word[len(word)-1] == "s" and word[len(word)-2] == "s":
             subject = word + "es"
         elif word[len(word)-1] == "h" and word[len(word)-2] == "c":
@@ -330,6 +409,8 @@ class Allegrograph(object):
                     dict["o2_comment"] = str(i["o"])
             array.append(dict)
             return array
+ 
+
 
     #Delete unnecessary symbols
     def delete_symbols(self, uri, method = None):

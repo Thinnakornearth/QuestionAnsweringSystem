@@ -6,7 +6,7 @@ NLTK corpus (Wordnet/Popular set) is downloaded
 # nltk.download('popular')
 #     To download the corpus for nltk (needed for first-time only)
 import nltk
-from nltk.corpus import wordnet
+from nltk.corpus import wordnet 
 
 # qword = input("Insert word to query: ")
 
@@ -33,12 +33,21 @@ def get_synonym(word):
                     synonyms.insert(0, name)
                 else:
                     synonyms.append(name)
-    print(synonyms)
+    print("Synonyms: ", synonyms)
     return synonyms
 
 
-# get_synonym(qword)
+def get_noun_syn(kws):
+    arr = []
+    for i in kws:
+        syn_array = get_synonym(i[0])
+        for j in syn_array:
+            arr.append((j, 'empty'))
+    print("Keyword and Synonyms ", arr)
+    return arr
+    
 
+array = [('management', 0.04491197687864554)]
 # ''' ---- This code below is to turn the common words text file to list ---- '''
 # common_words = []
 # with open(r'words.txt') as common_words_txt:

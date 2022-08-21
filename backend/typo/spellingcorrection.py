@@ -23,6 +23,8 @@ def fix_typo(word):
 	corrected = ""
 	for i in words :
 		corrected = corrected +" "+ spelling2.suggest(i)[0][0] # Spell checking word by word
-	print(corrected)
-	return corrected
+	newWord = corrected[1:]
+	print(newWord)
+
+	return newWord
 
