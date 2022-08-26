@@ -7,8 +7,10 @@ NLTK corpus (Wordnet/Popular set) is downloaded
 #     To download the corpus for nltk (needed for first-time only)
 import nltk
 from nltk.corpus import wordnet 
-nltk.download('popular')
+#if docker-compose, need to download 
+#nltk.download('popular')
     # To download the corpus for nltk (needed for first-time only)
+
 # qword = input("Insert word to query: ")
 
 

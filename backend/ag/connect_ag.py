@@ -116,7 +116,7 @@ class Allegrograph(object):
         return array
     
     def get_statement(self, word):
-        # word = fix_typo(word)
+        word = fix_typo(word)
         kw = []
         keyword = extract_kw(word)
         if len(word.split()) > 1:
