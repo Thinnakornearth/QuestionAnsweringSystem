@@ -27,10 +27,19 @@ function SearchBar() {
 
   const onChangeHandler = (text) => {
     let matches = [];
+    let count = 0;
+    const inputValue = text.toLowerCase();
+    const inputLegth = inputValue.length;
+
     if (text.length > 0) {
       matches = questions.filter((question) => {
-        const regex = new RegExp(`${text}`, "gi");
-        return question.s.match(regex);
+        const keep =
+          count < 10 && question.s.slice(0,inputLegth).toLowerCase() === inputValue;
+
+        if (keep) {
+          count += 1;
+        }
+        return keep;
       });
     }
     setSuggestion(matches);
