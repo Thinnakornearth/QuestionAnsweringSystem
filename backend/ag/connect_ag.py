@@ -4,12 +4,14 @@ from franz.openrdf.vocabulary.xmlschema import XMLSchema
 from franz.openrdf.query.query import QueryLanguage
 from franz.openrdf.rio.rdfformat import RDFFormat
 from franz.openrdf.vocabulary import RDF
+from regex import E
 from requests import RequestException
 from classifier.kw_extract import extract_kw, extract_verb
 import re
 from synonym.nltk_synonym import get_synonym
 from synonym.nltk_synonym import get_noun_syn
 from typo.spellingcorrection import fix_typo
+from random import randrange
 
 class Allegrograph(object):
     def __init__(self, repo, host, port, user, pass_word, create=True, clear=True):
@@ -158,94 +160,331 @@ class Allegrograph(object):
                                             return self.get_statement(domain[0]["o2"])
                                         elif temp.lower() in domain[0]["o_comment"].lower() or temp.lower() in domain[0]["o2_comment"].lower():
                                            return self.get_statement(domain[0]["o2"])
-                        #####Not Finish Noun Synonyms for this part !!!
                         else:
                             arr = []
-                            if each[len(each)-1] == "e":
-                                new_word = each[:len(each)-1] + "*"
-                            else:
-                                new_word = each + "*"
-                            free_text = self.free_text_search(new_word)
-                            if free_text:
-                                for each_text in free_text:
-                                    s = each_text["subject"].replace(" ", "")
-                                    query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?o . }" %s
-                                    tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
-                                    query = tuple_query.evaluate()
-                                    for each_query in query:
-                                        o = self.delete_symbols(str(each_query["o"]), "o")
-                                        if "_" in o:
-                                            for k in keyword:
-                                                t = each_text["o"].replace('."@en', '')
-                                                each_text["o"] = t
-                                                split = each_text["o"].split()
-                                                if k[0] in split and k[0] != each:
-                                                    arr.append(each_text)
-                                                    break
-                                if arr:
-                                    return arr
+                            each = get_synonym(each)
+                            for z in each:
+                                if z[len(z)-1] == "e":
+                                    new_word = z[:len(z)-1] + "*"
+                                else:
+                                    new_word = z + "*"
+                                free_text = self.free_text_search(new_word)
+                                if free_text:
+                                    for each_text in free_text:
+                                        s = each_text["subject"].replace(" ", "")
+                                        query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?o . }" %s
+                                        tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+                                        query = tuple_query.evaluate()
+                                        for each_query in query:
+                                            o = self.delete_symbols(str(each_query["o"]), "o")
+                                            if "_" in o:
+                                                for k in keyword:
+                                                    kws = get_synonym(k[0])
+                                                    for q in kws:
+                                                        t = each_text["o"].replace('."@en', '')
+                                                        each_text["o"] = t
+                                                        split = each_text["o"].split()
+                                                        if q in split and q != z:
+                                                            arr.append(each_text)
+                                                            break
+                                    if arr:
+                                        return arr
                                     
             
             #This else is for a query that has no verbs
             else:
                 kw = keyword
+#--------------------------------------------Draft of Suggested Questions ---------------------------------
             if (kw):
-                array = []
+                array = {"Actual Result": [], "Free-text": "", "Suggested Questions": []}
+                array_result = []
+                array_suggested_question = []
                 for key in kw:
                     result = key[0]
                     keyword_synonyms = result.split(" ")
                     for i in range(len(keyword_synonyms)):
-                        if array:
+                        if array_result:
                             break
                         arr_syn = get_synonym(keyword_synonyms[i])
+                        print(arr_syn)
                         for j in arr_syn:
                             j = ''.join(char for char in j if char.isalnum())
                             temp = result.replace(keyword_synonyms[i], j)
                             temp = ' '.join(elem.capitalize() for elem in temp.split())
                             print("Result: ", temp)
-                            array = self.get_simple_search(temp)
-                            if array:
+                            array_result = self.get_simple_search(temp)
+                            if array_result:
+                                array_suggested_question  = self.get_suggested_questions(*temp.split())
                                 break
                             else:
                                 temp = temp.lower()
-
-                           
-
-
                     # print("First keyword: ", result)
                     # print()
                     # result = ' '.join(elem.capitalize() for elem in result.split())
                     # array = self.get_simple_search(result)
-
             else:
                 return
-            if array:
+            if array_result:
+                array["Actual Result"] = array_result
+                array["Free-text"] = "No"
+                array["Suggested Questions"] = array_suggested_question 
                 return array
             else:
-                array = self.free_text_search(kw[0][0])
+                #Free text search starts here
+                for key in kw:
+                    result = key[0]
+                    keyword_synonyms = result.split(" ")
+                    for i in range(len(keyword_synonyms)):
+                        if array_result:
+                            break
+                        arr_syn = get_synonym(keyword_synonyms[i])
+                        print(arr_syn)
+                        for j in arr_syn:
+                            j = ''.join(char for char in j if char.isalnum())
+                            temp = result.replace(keyword_synonyms[i], j)
+                            temp = ' '.join(elem.capitalize() for elem in temp.split())
+                            print("Result: ", temp)
+                            array_result = self.free_text_search(temp)
+                            if array_result:
+                                array_suggested_question  = self.get_suggested_questions(*temp.split())
+                                break
+                            else:
+                                temp = temp.lower()
+                if array_suggested_question:
+                    array["Actual Result"] = "SQ_FOUND"
+                    array["Free-text"] = "Yes"
+                    array["Suggested Questions"] = array_suggested_question 
+                else:
+                    if array_result:
+                        array_suggested_question = self.get_suggested_questions(array_result, free_text=True)
+                        array["Actual Result"] = "SQ_NOT_FOUND"
+                        array["Free-text"] = "Yes"
+                        array["Suggested Questions"] = array_suggested_question 
                 if array:
                     return array
                 else:
                     for i in range(len(kw) -1, 0, -1):
                         print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
                         return self.get_statement(kw[i][0])
-
-
+#------------------------------Draft of Suggested Questions End Here -----------------------------------------------------
+        
         #This else if for statement that has only one word
         else:
-            result= word
-            array = self.get_simple_search(result)
-            if array:
-                return array
+            result_syn = get_synonym(word)
+            if result_syn:
+                for result in result_syn:
+                    array = self.get_simple_search(result)
+                    if array:
+                        return array
+                    else:
+                        array = self.free_text_search(result)
+                        if array:
+                            return array
+                        else:
+                            for i in range(len(kw) -1, 0, -1):
+                                print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
+                                return self.get_statement(kw[i][0])
             else:
-                array = self.free_text_search(result)
+                array = self.get_simple_search(word)
                 if array:
                     return array
-                else:
-                    for i in range(len(kw) -1, 0, -1):
-                        print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
-                        return self.get_statement(kw[i][0])
 
+
+    def get_suggested_questions(self, *args, free_text=False):
+        if free_text == True:
+            question_array = []
+            for i in args:
+                for j in i:
+                    question = "What is {0}".format(j["subject"])
+                    answer = j["o"]
+                    question_array.append({"Question": question, "Answer": answer})
+            return question_array
+        else:
+            array = []
+            word = ''
+            for each_word in args:
+                word += '"{0}" '.format(each_word)
+            query_string = """SELECT ?node1 ?pred1 ?node2 ?pred2 ?node3 ?pred3 ?node4
+                                WHERE {
+                                ?node1 fti:matchExpression '(or "%s")' ;
+                                    rdfs:subClassOf ?bn .
+                                    ?bn owl:onProperty ?pred1 .
+                                    ?pred1 rdfs:range ?node2 .
+                                ?node2 rdfs:subClassOf ?bn2 .
+                                    ?bn2 owl:onProperty ?pred2 .
+                                    ?pred2 rdfs:range ?node3 .
+                                ?node3 rdfs:subClassOf ?bn3 .
+                                    ?bn3 owl:onProperty ?pred3 .
+                                    ?pred3 rdfs:range ?node4 .
+                                FILTER (?node1 != ?node3) .
+                                FILTER (?node2 != ?node4) .
+                                }
+                                ORDER BY ASC(?node1)""" %word
+            tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+            query = tuple_query.evaluate()
+            for i in query:
+                if str(i["pred1"]):
+                    dict = {"node1": self.delete_symbols(str(i["node1"]), "s"),
+                            "pred1": self.delete_symbols(str(i["pred1"]), "s"),
+                            "node2": self.delete_symbols(str(i["node2"]), "s"),
+                            "pred2": self.delete_symbols(str(i["pred2"]), "s"),
+                            "node3": self.delete_symbols(str(i["node3"]), "s"),
+                            "pred3": self.delete_symbols(str(i["pred3"]), "s"),
+                            "node4": self.delete_symbols(str(i["node4"]), "s"),
+                            }
+                    array.append(dict)
+            question_array = []
+            for i in range(len(array)):
+                if array[i]["pred1"][:2] == "is":
+                    question = "What is the {0}?".format(array[i]["node1"])
+                    if not any(this["Question"] == question for this in question_array):
+                        ans = array[i]["node1"].replace(" ", "")
+                        actual_answer = self.get_simple_search(ans)
+                        question_array.append({"Question": question, "Answer": actual_answer})
+                else:
+                    s = array[i]["node1"].replace(" ", "")
+                    person = self.get_who_question(s)
+                    if person:
+                        if array[i]["node2"].split()[0] in array[i]["pred1"]:
+                            question = "Who {0} {1}?".format(array[i]["pred1"][:3], array[i]["node2"])
+                        else:
+                            question = "Who {0} {1}?".format(array[i]["pred1"], array[i]["node2"])
+                        if not any(this["Question"] == question for this in question_array):
+                            ans = array[i]["node1"].replace(" ", "")
+                            actual_answer = self.get_simple_search(ans)
+                            question_array.append({"Question": question, "Answer": actual_answer})
+                    else:
+                        if not array[i]["pred3"][:3] == "has":
+                            question = self.get_subclasses(array[i]["node1"], array[i]["pred1"], array[i]["node2"])
+                            if question:
+                                if not any(this["Question"] == question["Question"] for this in question_array):
+                                    question_array.append(question)
+                            else:
+                                question = "What is {0}?".format(array[i]["node1"])
+                                if not any(this["Question"] == question for this in question_array):
+                                    ans = array[i]["node1"].replace(" ", "")
+                                    actual_answer = self.get_simple_search(ans)
+                                    question_array.append({"Question": question, "Answer": actual_answer})    
+                        else:
+                            question = "What is the {0}?".format(array[i]["node2"])     
+                            if not any(this["Question"] == question for this in question_array):
+                                ans = array[i]["node2"].replace(" ", "")
+                                actual_answer = self.get_simple_search(ans)
+                                question_array.append({"Question": question, "Answer": actual_answer})               
+
+
+
+                if array[i]["pred2"][:2] == "is":
+                    question = "What is the {0}?".format(array[i]["node2"])
+                    if not any(this["Question"] == question for this in question_array):
+                        ans = array[i]["node2"].replace(" ", "")
+                        actual_answer = self.get_simple_search(ans)
+                        question_array.append({"Question": question, "Answer": actual_answer})
+                else:
+                    s = array[i]["node2"].replace(" ", "")
+                    person = self.get_who_question(s)
+                    if person:
+                        if array[i]["node3"].split()[0] in array[i]["pred2"]:
+                            question = "Who {0} {1}?".format(array[i]["pred2"][:3], array[i]["node3"])
+                        else:
+                            question = "Who {0} {1}?".format(array[i]["pred2"], array[i]["node3"])
+                        if not any(this["Question"] == question for this in question_array):
+                            ans = array[i]["node2"].replace(" ", "")
+                            actual_answer = self.get_simple_search(ans)
+                            question_array.append({"Question": question, "Answer": actual_answer})
+                    else:
+                        if not array[i]["pred3"][:3] == "has":
+                            question = self.get_subclasses(array[i]["node2"], array[i]["pred2"], array[i]["node3"])
+                            if question:
+                                if not any(this["Question"] == question["Question"] for this in question_array):
+                                    question_array.append(question)
+                        else:
+                            question = "What is the {0}?".format(array[i]["node3"])     
+                            if not any(this["Question"] == question for this in question_array):
+                                ans = array[i]["node3"].replace(" ", "")
+                                actual_answer = self.get_simple_search(ans)
+                                question_array.append({"Question": question, "Answer": actual_answer})  
+
+                if array[i]["pred3"][:2] == "is":
+                    question = "What is the {0}?".format(array[i]["node3"])
+                    if not any(this["Question"] == question for this in question_array):
+                        ans = array[i]["node3"].replace(" ", "")
+                        actual_answer = self.get_simple_search(ans)
+                        question_array.append({"Question": question, "Answer": actual_answer})
+                else:
+                    s = array[i]["node3"].replace(" ", "")
+                    person = self.get_who_question(s)
+                    if person:
+                        if array[i]["node4"].split()[0] in array[i]["pred3"]:
+                            question = "Who {0} {1}?".format(array[i]["pred3"][:3], array[i]["node4"])
+                        else:
+                            question = "Who {0} {1}?".format(array[i]["pred3"], array[i]["node4"])
+                        if not any(this["Question"] == question for this in question_array):
+                            ans = array[i]["node3"].replace(" ", "")
+                            actual_answer = self.get_simple_search(ans)
+                            question_array.append({"Question": question, "Answer": actual_answer})
+                    else:
+                        if not array[i]["pred3"][:3] == "has":
+                            question = self.get_subclasses(array[i]["node3"], array[i]["pred3"], array[i]["node4"])
+                            if question:
+                                if not any(this["Question"] == question["Question"] for this in question_array):
+                                    question_array.append(question)      
+                        else:
+                            question = "What is the {0}?".format(array[i]["node4"])     
+                            if not any(this["Question"] == question for this in question_array):
+                                ans = array[i]["node4"].replace(" ", "")
+                                actual_answer = self.get_simple_search(ans)
+                                question_array.append({"Question": question, "Answer": actual_answer})  
+
+            return question_array
+
+
+    def get_subclasses(self, node, predicate, node2):
+        pred = re.findall('[a-zA-Z][^A-Z]*', predicate)
+        updated_pred = ""
+        if len(pred) > 1:
+            if pred[len(pred)-1].lower() == re.findall('[a-zA-Z][^A-Z]*', node2)[0].replace(" ", "").lower():
+                updated_pred = self.remove_s(pred[0].replace(" ", ""))
+            else:
+                p = self.remove_s(pred[0].replace(" ", ""))
+                for i in range(1, len(pred)):
+                    if i == 1:
+                        p += " " + pred[i]
+                    else:
+                        p += pred[i]
+                updated_pred = p
+        else:
+            updated_pred = self.remove_s(pred[0].replace(" ", ""))
+        is_subclass = self.get_simple_search(node, object_subclass=True)
+        if is_subclass["s"]:
+            subclass_array = []
+            for q in range(len(is_subclass["s"])):
+                subclass_array.append(self.delete_symbols(is_subclass["s"][q], "s"))
+            question = "How does {0} {1} {2}?".format(node, updated_pred, node2)
+            ans = node.replace(" ", "")
+            return {"Question": question, "Answer": subclass_array}    
+
+
+    def remove_s(self, word):
+        new_word = ""
+        if word[len(word)-4:len(word)] == "sses":
+            new_word = word[:len(word)-2]
+        elif word[len(word)-4:len(word)] == "ches":
+            new_word = word[:len(word)-2]
+        elif word[len(word)-2: len(word)] == "es":
+            new_word = word[:len(word)-1]
+        else:
+            new_word = word[:len(word)-1]
+        return new_word
+
+    def get_who_question(self, subject):
+        query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?o . }" %subject
+        tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
+        query = tuple_query.evaluate()
+        for z in query:
+            if str(z["o"]) == "<http://www.semanticweb.org/zhenyuzhang/ontologies/DRANPTO/Person>":
+                return True
+        return False
 
     def get_who_search(self, word, original_query=None):
         verbs = extract_verb(word)
@@ -278,10 +517,20 @@ class Allegrograph(object):
                                     del keyword[index]
                                 kw = keyword
                                 for k in range(len(kw)):
-                                    if kw[k][0].lower() in domain[0]["o"].lower() or kw[k][0] in domain[0]["o2"].lower():
-                                        array = [{"domain": domain[0]["o2"], "comment": domain[0]["o2_comment"]}]
-                                    elif kw[k][0].lower() in domain[0]["o_comment"].lower() or kw[k][0] in domain[0]["o2_comment"].lower():
-                                        array = [{"domain": domain[0]["o2"], "comment": domain[0]["o2_comment"]}] 
+                                    result = kw[k][0]
+                                    keyword_synonyms = result.split(" ")
+                                    print("Keyword Synonym", keyword_synonyms)
+                                    for number_key in range(len(keyword_synonyms)):
+                                        arr_syn = get_synonym(keyword_synonyms[number_key])
+                                        for j in arr_syn:
+                                            j = ''.join(char for char in j if char.isalnum())
+                                            temp = result.replace(keyword_synonyms[number_key], j)
+                                            temp = ' '.join(elem.capitalize() for elem in temp.split())
+                                            print("Result: ", temp)
+                                            if temp.lower() in domain[0]["o"].lower() or temp.lower() in domain[0]["o2"].lower():
+                                                array = self.get_statement(domain[0]["o2"])
+                                            elif temp.lower() in domain[0]["o_comment"].lower() or temp.lower() in domain[0]["o2_comment"].lower():
+                                                array = self.get_statement(domain[0]["o2"])
         if array:
             return array
         else:
@@ -297,15 +546,28 @@ class Allegrograph(object):
 
 
 
-    def get_simple_search(self, result):
+    def get_simple_search(self, result, pred_subclass=False, object_subclass=False):
         array = []
         result = result.replace(" ", "")
-        query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %result
+        if pred_subclass:
+            query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#subClassOf> ?o . }" %result
+            
+        elif object_subclass:
+            query_string = "SELECT ?s  { ?s <http://www.w3.org/2000/01/rdf-schema#subClassOf> i:%s . }" %result
+        else:
+            query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %result
         tuple_query = self.conn.prepareTupleQuery(QueryLanguage.SPARQL, query_string)
         query = tuple_query.evaluate()
-        for i in query:
-            dict = {"subject": result, "o": str(i["o"])}
-            array.append(dict)
+        if object_subclass:
+            arr = []
+            for i in query:
+                arr.append(str(i["s"]))
+            dict = {"subject": result, "s": arr}
+            return dict
+        else:
+            for i in query:
+                dict = {"subject": result, "o": str(i["o"])}
+                array.append(dict)
         return array
 
     def free_text_search(self, result, questionMark=None):
@@ -315,7 +577,6 @@ class Allegrograph(object):
         self.conn.createFreeTextIndex("index1", predicates=[pred])
         if questionMark:
             result = result[:len(result)-1] + questionMark
-            print(result)
         for triple in self.conn.evalFreeTextSearch(
             result, index="index1"):
             s = self.delete_symbols(triple[0], "s")

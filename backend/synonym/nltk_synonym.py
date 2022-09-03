@@ -29,6 +29,10 @@ def get_synonym(word):
                     a = name.split("_")
                     word2 = a[len(a)-1].capitalize()
                     name = a[0] + "s" + word2
+                elif "-" in name:
+                    a = name.split("-")
+                    word2 = a[len(a)-1].capitalize()
+                    name = a[0] + "s" + word2  
                 if name == word:
                     synonyms.insert(0, name)
                 else:
