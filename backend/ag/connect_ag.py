@@ -116,10 +116,12 @@ class Allegrograph(object):
             dict = {"s": s, "p": p, "o": o}
             array.append(dict)
         return array
-    
+
+ #--------------------------------------------Draft of Suggested Questions ---------------------------------  
     def get_statement(self, word):
         word = fix_typo(word)
         kw = []
+        array = []
         keyword = extract_kw(word)
         if len(word.split()) > 1:
             if word.split()[0] == "who":
@@ -157,9 +159,22 @@ class Allegrograph(object):
                                         temp = ' '.join(elem.capitalize() for elem in temp.split())
                                         print("Result: ", temp)
                                         if temp.lower() in domain[0]["o"].lower() or temp.lower() in domain[0]["o2"].lower():
-                                            return self.get_statement(domain[0]["o2"])
+                                            array = {"Actual Result": [], "Free-text": "", "Suggested Questions": []} 
+                                            array["Actual Result"] = self.get_simple_search(domain[0]["o2"])
+                                            array["Free-text"] = "No"
+                                            space = re.sub(r"(\w)([A-Z])", r"\1 \2", domain[0]["o2"])
+                                            array_suggested_question  = self.get_suggested_questions(*space.split())
+                                            array["Suggested Questions"] = array_suggested_question 
+                                            return array
                                         elif temp.lower() in domain[0]["o_comment"].lower() or temp.lower() in domain[0]["o2_comment"].lower():
-                                           return self.get_statement(domain[0]["o2"])
+                                            array = {"Actual Result": [], "Free-text": "", "Suggested Questions": []} 
+                                            array["Actual Result"] = self.get_simple_search(domain[0]["o2"])
+                                            array["Free-text"] = "No"
+                                            space = re.sub(r"(\w)([A-Z])", r"\1 \2", domain[0]["o2"])
+                                            array_suggested_question  = self.get_suggested_questions(*space.split())
+                                            array["Suggested Questions"] = array_suggested_question 
+                                            return array
+              
                         else:
                             arr = []
                             each = get_synonym(each)
@@ -179,6 +194,8 @@ class Allegrograph(object):
                                             o = self.delete_symbols(str(each_query["o"]), "o")
                                             if "_" in o:
                                                 for k in keyword:
+                                                    if arr:
+                                                        break
                                                     kws = get_synonym(k[0])
                                                     for q in kws:
                                                         t = each_text["o"].replace('."@en', '')
@@ -188,13 +205,31 @@ class Allegrograph(object):
                                                             arr.append(each_text)
                                                             break
                                     if arr:
-                                        return arr
+                                        array = {"Actual Result": [], "Free-text": "", "Suggested Questions": []}
+                                        subject = arr[0]['subject']
+                                        array_suggested_question  = self.get_suggested_questions(*subject.split())
+                                        array["Actual Result"] = arr
+                                        array["Free-text"] = "No"
+                                        array["Suggested Questions"] = array_suggested_question 
+                                        return array
+                     
+                                
+                if not array:
+                    for each_key in keyword:
+                        free_text = self.free_text_search(each_key[0])
+                        if free_text:
+                            array = {"Actual Result": [], "Free-text": "", "Suggested Questions": []} 
+                            array["Actual Result"] = "SQ_FOUND"
+                            array["Free-text"] = "Yes"
+                            array_suggested_question  = self.get_suggested_questions(*each_key[0].split())
+                            array["Suggested Questions"] = array_suggested_question    
+                    return array               
                                     
-            
+
             #This else is for a query that has no verbs
             else:
                 kw = keyword
-#--------------------------------------------Draft of Suggested Questions ---------------------------------
+            
             if (kw):
                 array = {"Actual Result": [], "Free-text": "", "Suggested Questions": []}
                 array_result = []
@@ -268,18 +303,31 @@ class Allegrograph(object):
                         return self.get_statement(kw[i][0])
 #------------------------------Draft of Suggested Questions End Here -----------------------------------------------------
         
-        #This else if for statement that has only one word
+        #This else is for statement that has only one word
         else:
             result_syn = get_synonym(word)
             if result_syn:
                 for result in result_syn:
-                    array = self.get_simple_search(result)
+                    print(result)
+                    array = self.get_simple_search(result.title().replace(" ", ""))
                     if array:
-                        return array
+                        array2 = {"Actual Result": [], "Free-text": "", "Suggested Questions": []} 
+                        array2["Actual Result"] = array[0]
+                        array2["Free-text"] = "No"
+                        space = re.sub(r"(\w)([A-Z])", r"\1 \2", array[0]["subject"])
+                        array_suggested_question  = self.get_suggested_questions(*space.split())
+                        array2["Suggested Questions"] = array_suggested_question 
+                        return array2
                     else:
                         array = self.free_text_search(result)
                         if array:
-                            return array
+                            array2 = {"Actual Result": [], "Free-text": "", "Suggested Questions": []} 
+                            array2["Actual Result"] = "SQ_FOUND"
+                            array2["Free-text"] = "Yes"
+                            space = re.sub(r"(\w)([A-Z])", r"\1 \2", result)
+                            array_suggested_question  = self.get_suggested_questions(*space.split())
+                            array2["Suggested Questions"] = array_suggested_question 
+                            return array2
                         else:
                             for i in range(len(kw) -1, 0, -1):
                                 print("Keyword Iteration No.{0}: {1}".format(len(kw)-i, kw[i][0]))
@@ -459,7 +507,8 @@ class Allegrograph(object):
         if is_subclass["s"]:
             subclass_array = []
             for q in range(len(is_subclass["s"])):
-                subclass_array.append(self.delete_symbols(is_subclass["s"][q], "s"))
+                subclass_array.append(self.get_simple_search(self.delete_symbols(is_subclass["s"][q], "s")))
+                
             question = "How does {0} {1} {2}?".format(node, updated_pred, node2)
             ans = node.replace(" ", "")
             return {"Question": question, "Answer": subclass_array}    
@@ -528,11 +577,17 @@ class Allegrograph(object):
                                             temp = ' '.join(elem.capitalize() for elem in temp.split())
                                             print("Result: ", temp)
                                             if temp.lower() in domain[0]["o"].lower() or temp.lower() in domain[0]["o2"].lower():
-                                                array = self.get_statement(domain[0]["o2"])
+                                                array = self.get_simple_search(domain[0]["o2"])
                                             elif temp.lower() in domain[0]["o_comment"].lower() or temp.lower() in domain[0]["o2_comment"].lower():
-                                                array = self.get_statement(domain[0]["o2"])
+                                                array = self.get_simple_search(domain[0]["o2"])
         if array:
-            return array
+            array2 = {"Actual Result": [], "Free-text": "", "Suggested Questions": []} 
+            array2["Actual Result"] = array[0]
+            array2["Free-text"] = "No"
+            space = re.sub(r"(\w)([A-Z])", r"\1 \2", array[0]["subject"])
+            array_suggested_question  = self.get_suggested_questions(*space.split())
+            array2["Suggested Questions"] = array_suggested_question 
+            return array2
         else:
             if domain_temp:
                 return self.get_who_search(domain_temp[0]["Domain"][:len(domain_temp[0]["Domain"])-1], original_query=word_temp)
@@ -584,7 +639,10 @@ class Allegrograph(object):
             o = self.delete_symbols(triple[2], "o")
             dict = {"s": s, "p": p, "o": o}
             subject = dict["s"]
+            if "#" in subject:
+                subject = subject.split("#")[1]
             #fixhere
+            
             subject2 = ' '.join(elem.capitalize() for elem in subject.split())
             subject2 = subject.replace(" ", "")
             query_string = "SELECT ?o { i:%s <http://www.w3.org/2000/01/rdf-schema#comment> ?o . }" %subject2
