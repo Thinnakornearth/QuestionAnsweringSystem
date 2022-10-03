@@ -11,6 +11,7 @@ def get_all_data():
     ag = Allegrograph(repo='dranpto', host="agraph", port=10035, user="test", pass_word="xyzzy", create=True, clear=False)
     result = ag.get_all_triples()
     array = []
+    print("/")
     for i in result:
         if "comment" in i["p"]:
             array.append(i)
@@ -22,6 +23,7 @@ def get_statement():
     search_statement = request.args.get('query')
     ag = Allegrograph(repo='dranpto', host="agraph", port=10035, user="test", pass_word="xyzzy", create=True, clear=False)
     result = ag.get_statement(search_statement)
+    print("/search")
     return json.dumps(result)
 
     
