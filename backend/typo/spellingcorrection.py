@@ -1,12 +1,12 @@
 from textblob import TextBlob
 from textblob.en import Spelling        
 import re
-
+import os
 
 
 def fix_typo(word):
 	textToLower = ""
-	with open("/home/parallels/Documents/CSIT998-AG/Main_QA/backend/typo/dranpto+en-spelling.txt","r",encoding="utf-8") as f2:           # Open our source file
+	with open(f"{os.getcwd()}/typo/dranpto+en-spelling.txt","r",encoding="utf-8") as f2:           # Open our source file
 
 		text = f2.read()                                  # Read the file                 
 		textToLower = text.lower()                        # Lower all the capital letters
