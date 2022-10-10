@@ -10,14 +10,14 @@ services:
       - qas
     depends_on:
       - agraph
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - 8080:80
-  #   networks:
-  #     - qas
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - 8080:3000
+    networks:
+      - qas
   agraph:
     image: franzinc/agraph
     restart: always
